@@ -2,7 +2,9 @@
 import AdjustCameraLocation as ad
 import cv2, os, pymysql, operator, copy
 import numpy as np
-from keras.models import load_model
+# from keras.models import load_model
+from tensorflow.keras.models import load_model
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 ip = ad.ip
@@ -25,16 +27,16 @@ def Initialization():
 	model = load_model('./h5_file/new_model_v2.h5')	# Machine Learning Model
 	
 	# Initialize mysql
-	db = pymysql.connect("localhost", "root", "root", "chess")
-	cursor = db.cursor()
-	cursor.execute("DROP TABLE IF EXISTS chess")
-	sql1 = """CREATE TABLE chess (
-				Id INT AUTO_INCREMENT,
-				STEP CHAR(4) NOT NULL,
-				PRIMARY KEY(Id)
-			)"""
-	cursor.execute(sql1)
-	print('SQL Initialized.')
+	# db = pymysql.connect("localhost", "root", "root", "chess")
+	# cursor = db.cursor()
+	# cursor.execute("DROP TABLE IF EXISTS chess")
+	# sql1 = """CREATE TABLE chess (
+	# 			Id INT AUTO_INCREMENT,
+	# 			STEP CHAR(4) NOT NULL,
+	# 			PRIMARY KEY(Id)
+	# 		)"""
+	# cursor.execute(sql1)
+	# print('SQL Initialized.')
 	
 	# Initialize grid width
 	frame0 = cv2.imread('./Test_Image/Step 0.png', 0)
@@ -45,13 +47,59 @@ def Initialization():
 	GRID_WIDTH_VERTI = (end_point[1] - begin_point[1])/9
 	print('Recognition Initialized.\n')
 
+# def PiecePrediction(model, img, target_size, top_n=3):
+# 	x = cv2.resize(img, target_size)
+# 	x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB)
+# 	x = x / 255
+# 	x = np.expand_dims(x, axis=0)
+# 	preds = model.predict_classes(x)
+# 	return label_type[int(preds)]
+
+import numpy as np  # nhớ đảm bảo có dòng này ở đầu file
+
+# def PiecePrediction(model, piece, target_size):
+#     img = cv2.resize(piece, target_size)
+#     img = img.astype('float32') / 255.0
+
+#     # tuỳ model training là input dạng gì, project này thường dùng (H, W, 1)
+#     # nên ta reshape về (1, H, W, 1)
+#     if img.ndim == 2:  # grayscale
+#         x = img.reshape((1, img.shape[0], img.shape[1], 1))
+#     else:  # lỡ là 3 kênh
+#         x = img.reshape((1, img.shape[0], img.shape[1], img.shape[2]))
+
+#     # Dự đoán xác suất / logits
+#     preds = model.predict(x)        # shape: (1, num_classes)
+
+#     # Tự lấy class lớn nhất thay cho predict_classes
+#     predict_category = int(np.argmax(preds, axis=1)[0])
+
+#     return predict_category
+
+# def PiecePrediction(model, img, target_size, top_n=3):
+#     x = cv2.resize(img, target_size)
+#     x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB)
+#     x = x.astype('float32') / 255.0
+#     x = np.expand_dims(x, axis=0)
+
+#     preds = model.predict(x)
+#     idx = int(np.argmax(preds, axis=1)[0])
+#     return label_type[idx]
+
 def PiecePrediction(model, img, target_size, top_n=3):
-	x = cv2.resize(img, target_size)
-	x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB)
-	x = x / 255
-	x = np.expand_dims(x, axis=0)
-	preds = model.predict_classes(x)
-	return label_type[int(preds)]
+    x = cv2.resize(img, target_size)
+    x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB)
+    x = x.astype('float32') / 255.0
+    x = np.expand_dims(x, axis=0)
+
+    # Tắt progress bar
+    preds = model.predict(x, verbose=0)
+
+    idx = int(np.argmax(preds, axis=1)[0])
+    return label_type[idx]
+
+
+
 
 def savePath(beginPoint, endPoint, piece):
 	global legal_move	# For indicating error movement
@@ -211,63 +259,366 @@ def PiecesChangeDetection(current_step):
 		beginPoint, endPoint, piece = CalculateTrace(previous_step, current_step, x, y, w, h)
 		if beginPoint != [] and endPoint != [] and piece != []:
 			text, predict_category = savePath(beginPoint, endPoint, piece)
-			if legal_move:
-				sql2 = "INSERT INTO chess(STEP) VALUES (\'%s\')" % text
-				cursor.execute(sql2)
-				db.commit()
-			else:
-				print('%s performed a illegal movement!' % dic[predict_category])
+			# if legal_move:
+			# 	sql2 = "INSERT INTO chess(STEP) VALUES (\'%s\')" % text
+			# 	cursor.execute(sql2)
+			# 	db.commit()
+			# else:
+			# 	print('%s performed a illegal movement!' % dic[predict_category])   
 		else:
 			return 0
+		# if legal_move:
+		# 	cv2.imwrite('./Test_Image/Step %d.png' % (step + 1), current_step)
+		# 	return 1
+		# else:
+		# 	print('Please rollback to step %d' % step)
+		# 	while (True):
+		# 		r, frame = cap.read()
+		# 		frame = frame[0:480, 0:480]
+		# 		x, y, w, h = changeDetection(previous_step, frame)
+		# 		if x != 0 and y != 0 and x + w != 480 and y + h != 480 and compare(previous_step, frame, x, y, w, h):
+		# 			legal_move = True
+		# 			cv2.imwrite('./Test_Image/Step %d.png' % step, frame)
+		# 			print('Rollback successfully!')
+		# 			break
+		# 	return 0
 		if legal_move:
 			cv2.imwrite('./Test_Image/Step %d.png' % (step + 1), current_step)
 			return 1
 		else:
-			print('Please rollback to step %d' % step)
-			while (True):
-				r, frame = cap.read()
-				frame = frame[0:480, 0:480]
-				x, y, w, h = changeDetection(previous_step, frame)
-				if x != 0 and y != 0 and x + w != 480 and y + h != 480 and compare(previous_step, frame, x, y, w, h):
-					legal_move = True
-					cv2.imwrite('./Test_Image/Step %d.png' % step, frame)
-					print('Rollback successfully!')
-					break
+			print('Illegal move detected – skip rollback (debug mode).')
+			legal_move = True
 			return 0
 
-if __name__ == '__main__':
-	# Initialize camera
-	# cap = cv2.VideoCapture("http://admin:admin@%s:8081/" % ip)
-	cap = cv2.VideoCapture('./Sources/test.avi')
-	if cap.isOpened():
-		for j in range(20):
-			cap.read()
-		ret, current_frame = cap.read()
-		current_frame = current_frame[0:480, 0:480]
-		cv2.imwrite('./Test_Image/Step 0.png', current_frame)
-	else:
-		exit('Camera is not open.')
-	print('Camera Initialized.')
-	previous_frame = current_frame
-	Initialization()
-	while (cap.isOpened()):
-		x, y, w, h = changeDetection(current_frame, previous_frame)
-		if (x == 0 and y == 0 and w == 480 and h == 480):
-			num = PiecesChangeDetection(current_frame)
-			if num == 1:
-				step += 1
-				isRed = bool(1 - isRed)
-			elif num == 0: 
-				pass
-		previous_frame = current_frame.copy()
-		ret, current_frame = cap.read()
-		if not ret:
-			break
-		current_frame = current_frame[0:480, 0:480]
-		cv2.rectangle(current_frame, ad.begin, (ad.begin[0] + 400, ad.begin[1] + 400), (255, 255, 255), 2)
-		cv2.imshow('', current_frame)
-		cv2.waitKey(1)
+# if __name__ == '__main__':
+# 	# Initialize camera
+# 	# cap = cv2.VideoCapture("http://admin:admin@%s:8081/" % ip)
+# 	cap = cv2.VideoCapture('./Sources/test55.mp4')
+# 	# cap = cv2.VideoCapture(0)
+# 	if cap.isOpened():
+# 		for j in range(20):
+# 			cap.read()
+# 		ret, current_frame = cap.read()
+# 		current_frame = current_frame[0:480, 0:480]
+# 		# current_frame = cv2.resize(current_frame, (480, 480))
+# 		cv2.imwrite('./Test_Image/Step 0.png', current_frame)
+# 	else:
+# 		exit('Camera is not open.')
+# 	print('Camera Initialized.')
+# 	previous_frame = current_frame
+# 	Initialization()
+# 	while (cap.isOpened()):
+# 		x, y, w, h = changeDetection(current_frame, previous_frame)
+# 		if (x == 0 and y == 0 and w == 480 and h == 480):
+# 			num = PiecesChangeDetection(current_frame)
+# 			if num == 1:
+# 				step += 1
+# 				isRed = bool(1 - isRed)
+# 			elif num == 0: 
+# 				pass
+# 		previous_frame = current_frame.copy()
+# 		ret, current_frame = cap.read()
+# 		if not ret:
+# 			break
+# 		current_frame = current_frame[0:480, 0:480]
+# 		# current_frame = cv2.resize(current_frame, (480, 480))
+# 		cv2.rectangle(current_frame, ad.begin, (ad.begin[0] + 400, ad.begin[1] + 400), (255, 255, 255), 2)
+# 		cv2.imshow('', current_frame)
+# 		# cv2.waitKey(1)
+# 		key = cv2.waitKey(1) & 0xFF
+# 		if key == ord('q'):
+# 			break
 
-	cap.release()
-	cv2.destroyAllWindows()
-	db.close()
+
+# 	cap.release()
+# 	cv2.destroyAllWindows()
+# 	# db.close()
+
+# if __name__ == '__main__':
+#     # Mở webcam (thử 0, nếu không được thì thử 1, 2...)
+#     # cap = cv2.VideoCapture('./Sources/test3.mp4')
+#     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+	
+#     if not cap.isOpened():
+#         exit('Camera is not open.')
+
+#     print("Camera mở rồi.")
+#     print("Đặt bàn cờ vào khung hình, chỉnh cho rõ nét.")
+#     print("Bấm phím 's' để CHỤP Step 0, 'q' để thoát.")
+
+#     step0 = None
+
+#     while True:
+#         ret, frame = cap.read()
+#         if not ret:
+#             print("Không đọc được frame từ camera.")
+#             break
+
+#         # Resize/crop về đúng 480x480 (tuỳ bạn đang làm gì)
+#         # frame = cv2.resize(frame, (480, 480))
+#         frame = frame[0:480, 0:480]
+
+#         cv2.imshow('Preview - nhấn s để chụp Step 0', frame)
+#         key = cv2.waitKey(50) & 0xFF
+
+#         if key == ord('s'):
+#             step0 = frame.copy()
+#             cv2.imwrite('./Test_Image/Step 0.png', step0)
+#             print("Đã chụp và lưu /Test_Image/Step 0.png")
+#             break
+#         elif key == ord('q'):
+#             cap.release()
+#             cv2.destroyAllWindows()
+#             exit(0)
+
+#     if step0 is None:
+#         cap.release()
+#         cv2.destroyAllWindows()
+#         exit("Không có Step 0 để khởi tạo.")
+
+#     print('Camera Initialized.')
+#     previous_frame = step0.copy()
+
+#     # Gọi Initialization (đang đọc lại từ file Step 0.png)
+#     Initialization()
+
+#     # ----- Vòng lặp chính -----
+#     while cap.isOpened():
+#         ret, current_frame = cap.read()
+#         if not ret:
+#             break
+
+#         current_frame = current_frame[0:480, 0:480]
+
+#         x, y, w, h = changeDetection(current_frame, previous_frame)
+#         if (x == 0 and y == 0 and w == 480 and h == 480):
+#             num = PiecesChangeDetection(current_frame)
+#             if num == 1:
+#                 step += 1
+#                 isRed = bool(1 - isRed)
+
+#         previous_frame = current_frame.copy()
+
+#         cv2.rectangle(current_frame, ad.begin, (ad.begin[0] + 400, ad.begin[1] + 400), (255, 255, 255), 2)
+#         cv2.imshow('Chinese Chess', current_frame)
+#         key = cv2.waitKey(50) & 0xFF
+#         if key == ord('q'):
+#             break
+
+#     cap.release()
+#     cv2.destroyAllWindows()
+
+# if __name__ == '__main__':
+
+
+#     # Mở webcam (nếu 0 không được thì thử 1,2,...)
+#     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+#     # cap = cv2.VideoCapture('./Sources/test.avi')
+
+#     if not cap.isOpened():
+#         exit('Camera is not open.')
+
+#     print("Camera mở rồi.")
+#     print("Đặt bàn cờ vào bên trong Ô VUÔNG trên màn hình.")
+#     print("Bấm phím 's' để CHỤP Step 0, 'q' để thoát.")
+
+#     step0 = None
+
+#     while True:
+#         ret, frame = cap.read()
+#         if not ret:
+#             print("Không đọc được frame từ camera.")
+#             break
+
+#         h, w = frame.shape[:2]
+
+#         # Kích thước ô vuông (tối đa 480, nhưng không lớn hơn frame)
+#         side = min(480, w, h)
+
+#         # Cắt và vẽ ô vuông ở giữa khung hình
+#         x0 = (w - side) // 2
+#         y0 = (h - side) // 2
+#         x1 = x0 + side
+#         y1 = y0 + side
+
+#         # Vẽ KHUNG Ô VUÔNG để ông canh bàn cờ
+#         preview = frame.copy()
+#         cv2.rectangle(preview, (x0, y0), (x1, y1), (0, 255, 0), 2)
+
+#         cv2.imshow("Align board & press 's' to capture Step 0", preview)
+#         key = cv2.waitKey(1) & 0xFF
+
+#         if key == ord('s'):
+#             # Cắt đúng vùng ô vuông làm Step 0 (KHÔNG vẽ khung vào ảnh lưu)
+#             step0 = frame[y0:y1, x0:x1].copy()
+#             cv2.imwrite('./Test_Image/Step 0.png', step0)
+# #           print("Đã chụp và lưu /Test_Image/Step 0.png")
+#             break
+#         elif key == ord('q'):
+#             cap.release()
+#             cv2.destroyAllWindows()
+#             exit(0)
+
+#     if step0 is None:
+#         cap.release()
+#         cv2.destroyAllWindows()
+#         exit("Không có Step 0 để khởi tạo.")
+
+#     print('Camera Initialized.')
+
+#     # ---- từ đây trở xuống: dùng step0 làm frame đầu, giống logic cũ ----
+#     previous_frame = step0.copy()
+
+#     # Hàm Initialization của ông vẫn đọc ./Test_Image/Step 0.png
+#     Initialization()
+
+#     # Vòng lặp chính
+#     while cap.isOpened():
+#         ret, current_frame = cap.read()
+#         if not ret:
+#             break
+
+#         # Cũng cắt đúng vùng ô vuông giống lúc chụp Step 0
+#         h, w = current_frame.shape[:2]
+#         side = min(480, w, h)
+#         x0 = (w - side) // 2
+#         y0 = (h - side) // 2
+#         x1 = x0 + side
+#         y1 = y0 + side
+#         current_frame = current_frame[y0:y1, x0:x1]
+
+#         x, y, w_box, h_box = changeDetection(current_frame, previous_frame)
+#         if (x == 0 and y == 0 and w_box == side and h_box == side):
+#             num = PiecesChangeDetection(current_frame)
+#             if num == 1:
+#                 step += 1
+#                 isRed = bool(1 - isRed)
+
+#         previous_frame = current_frame.copy()
+
+#         # Vẽ lại ô vuông cho vui (không bắt buộc, vì frame đã là 480x480 rồi)
+#         cv2.rectangle(current_frame, (0, 0), (side - 1, side - 1), (0, 255, 0), 2)
+
+#         cv2.imshow('Chinese Chess', current_frame)
+#         key = cv2.waitKey(1) & 0xFF
+#         if key == ord('q'):
+#             break
+
+#     cap.release()
+#     cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    # cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    cap = cv2.VideoCapture('./Sources/test31.mp4')
+
+    if not cap.isOpened():
+        exit('Camera is not open.')
+
+    print("Camera mở rồi.")
+    print("Đặt bàn cờ vào trong KHUNG VUÔNG.")
+    print("Bấm phím 's' để CHỤP Step 0, 'q' để thoát.")
+
+    step0 = None
+    os.makedirs('./Test_Image', exist_ok=True)
+
+    while True:
+        ret, current_frame = cap.read()
+        if not ret:
+            print("Không đọc được frame từ camera.")
+            break
+
+        # Cắt 480x480 góc trên trái
+        current_frame = current_frame[0:480, 0:480]
+
+        # Vẽ khung như code gốc của bạn
+        cv2.rectangle(
+            current_frame,
+            ad.begin,
+            (ad.begin[0] + 400, ad.begin[1] + 400),
+            (255, 255, 255),
+            2
+        )
+
+		# Tính toạ độ khung
+        x0, y0 = ad.begin
+        x1, y1 = x0 + 400, y0 + 400
+
+       # Tâm khung
+        cx = (x0 + x1) // 2
+        cy = (y0 + y1) // 2
+
+# Vẽ đường dọc đi qua tâm
+        cv2.line(current_frame, (cx, y0), (cx, y1), (255, 255, 255), 1)
+
+# Vẽ đường ngang đi qua tâm
+        cv2.line(current_frame, (x0, cy), (x1, cy), (255, 255, 255), 1)
+
+        cv2.imshow("Canh khung rồi bấm 's' để chụp Step 0", current_frame)
+        key = cv2.waitKey(10) & 0xFF
+
+        if key == ord('s'):
+            # Lưu frame hiện tại làm Step 0
+            step0 = current_frame.copy()
+            cv2.imwrite('./Test_Image/Step 0.png', step0)
+            print("Đã chụp Step 0, shape =", step0.shape)
+            break
+
+        elif key == ord('q'):
+            break
+
+    if step0 is None:
+        cap.release()
+        cv2.destroyAllWindows()
+        exit("Không có Step 0 để khởi tạo.")
+
+    print('Camera Initialized.')
+    previous_frame = step0.copy()
+
+    Initialization()
+
+    # --- Vòng lặp chính phía sau giữ như cũ ---
+    while cap.isOpened():
+        ret, current_frame = cap.read()
+        if not ret:
+            break
+
+        current_frame = current_frame[0:480, 0:480]
+        # current_frame = cv2.resize(current_frame, (480, 480))
+
+        x, y, w, h = changeDetection(current_frame, previous_frame)
+        if (x == 0 and y == 0 and w == 480 and h == 480):
+            num = PiecesChangeDetection(current_frame)
+            if num == 1:
+                step += 1
+                isRed = bool(1 - isRed)
+
+        previous_frame = current_frame.copy()
+
+        cv2.rectangle(
+            current_frame,
+            ad.begin,
+            (ad.begin[0] + 400, ad.begin[1] + 400),
+            (255, 255, 255),
+            2
+        )
+
+				# Tính toạ độ khung
+        x0, y0 = ad.begin
+        x1, y1 = x0 + 400, y0 + 400
+
+       # Tâm khung
+        cx = (x0 + x1) // 2
+        cy = (y0 + y1) // 2
+
+# Vẽ đường dọc đi qua tâm
+        cv2.line(current_frame, (cx, y0), (cx, y1), (255, 255, 255), 1)
+
+# Vẽ đường ngang đi qua tâm
+        cv2.line(current_frame, (x0, cy), (x1, cy), (255, 255, 255), 1)
+        cv2.imshow('', current_frame)
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
