@@ -7,6 +7,7 @@ from tensorflow.keras.models import load_model
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
+
 ip = ad.ip
 pieceTypeList = ['b_jiang','b_ju', 'b_ma', 'b_pao', 'b_shi', 'b_xiang', 'b_zu',
 		'r_bing', 'r_ju', 'r_ma', 'r_pao', 'r_shi', 'r_shuai', 'r_xiang']
@@ -509,7 +510,7 @@ def PiecesChangeDetection(current_step):
 
 if __name__ == '__main__':
     # cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    cap = cv2.VideoCapture('./Sources/test31.mp4')
+    cap = cv2.VideoCapture('./Sources/test.avi')
 
     if not cap.isOpened():
         exit('Camera is not open.')
